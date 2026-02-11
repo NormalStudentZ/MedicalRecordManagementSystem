@@ -70,6 +70,23 @@ def create_app(config_name=None):
     def hello_world():
         return "<p>Hello, World!</p>"
 
+    @app.route('/test-db')
+    def test_db_connection():
+        try:
+            # 尝试执行一个简单的查询
+            from sqlalchemy import text
+            result = db.session.execute(text('SELECT 1'))
+            return {
+                'status': 'success',
+                'message': 'Database connection successful',
+                'data': {'result': result.scalar()}
+            }
+        except Exception as e:
+            return {
+                'status': 'error',
+                'message': f'Database connection failed: {str(e)}'
+            }, 500
+
     # login_before_request(app)
 
     return app
