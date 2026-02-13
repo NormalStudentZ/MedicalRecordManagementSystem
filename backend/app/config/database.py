@@ -7,7 +7,7 @@ class DatabaseConfig:
     DB_PORT = os.getenv('DB_PORT', '5432')
     DB_USER = os.getenv('DB_USER', 'postgres')
     DB_PASSWORD = quote_plus(os.getenv('DB_PASSWORD', 'hhh114514'))
-    DB_NAME = os.getenv('DB_NAME', 'CaseManagementSystem')
+    DB_NAME = os.getenv('DB_NAME', 'MedicalRecordManagementSystem')
 
     # 连接池配置
     POOL_SIZE = int(os.getenv('POOL_SIZE', '10'))
