@@ -1,7 +1,9 @@
 import os
-from .config import config_dict
+from app.config.environments import config_dict
 from flask import Flask
 from flask_migrate import Migrate
+
+from .config.pool import init_pool_monitor, check_connection_health
 from .extensions import db,cors,mail
 # 动态注册蓝图
 def register_blueprints(app):
@@ -44,14 +46,26 @@ def create_app(config_name=None):
 
     # 验证数据库URI
     print(f"Using database: {app.config['SQLALCHEMY_DATABASE_URI']}")
+    print(f"Connection pool config: size={app.config.get('POOL_SIZE')}, max_overflow={app.config.get('MAX_OVERFLOW')}")
 
     # 注册蓝图
     register_blueprints(app)
+
+    # 初始化连接池监控
+    init_pool_monitor(app)
 
     # 创建数据库表（仅开发环境）
     if app.config.get('ENV') == 'development':
         with app.app_context():
             db.create_all()
+
+        # 测试数据库连接
+        with app.app_context():
+            health = check_connection_health()
+            if health['status'] == 'healthy':
+                print("✓ Database connection pool initialized successfully")
+            else:
+                print(f"✗ Database connection failed: {health.get('message')}")
 
     if app.debug:
         @app.get('/debug/routes')
@@ -72,14 +86,35 @@ def create_app(config_name=None):
 
     @app.route('/test-db')
     def test_db_connection():
+        """测试数据库连接"""
         try:
-            # 尝试执行一个简单的查询
+            # 使用连接池获取连接
             from sqlalchemy import text
-            result = db.session.execute(text('SELECT 1'))
+            from .config.pool import get_db_connection, check_connection_health
+
+            # 检查健康状态
+            health = check_connection_health()
+
+            # 获取连接池状态
+            engine = db.get_engine()
+            pool_status = {
+                'size': engine.pool.size(),
+                'checked_in': engine.pool.checkedin(),
+                'checked_out': engine.pool.checkedout(),
+                'overflow': engine.pool.overflow()
+            }
+
             return {
                 'status': 'success',
-                'message': 'Database connection successful',
-                'data': {'result': result.scalar()}
+                'message': 'Database connection pool is working',
+                'health_check': health,
+                'pool_status': pool_status,
+                'config': {
+                    'pool_size': app.config.get('POOL_SIZE'),
+                    'max_overflow': app.config.get('MAX_OVERFLOW'),
+                    'pool_recycle': app.config.get('POOL_RECYCLE'),
+                    'pool_pre_ping': app.config.get('POOL_PRE_PING'),
+                }
             }
         except Exception as e:
             return {
